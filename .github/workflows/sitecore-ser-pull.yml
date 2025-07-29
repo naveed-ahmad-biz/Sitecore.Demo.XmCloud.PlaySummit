@@ -1,0 +1,46 @@
+name: Sitecore Serialization Pull
+
+on:
+  workflow_dispatch:
+
+jobs:
+  sitecore-ser-pull:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'  # Adjust based on your Sitecore CLI version
+
+      - name: Install Sitecore CLI Tools
+        run: dotnet tool restore
+
+      - name: Authenticate Sitecore CLI
+        run: |
+          dotnet sitecore login --client-credentials \
+            --client-id ${{ secrets.SITECORE_CLIENT_ID }} \
+            --client-secret ${{ secrets.SITECORE_CLIENT_SECRET }} \
+            --authority ${{ secrets.SITECORE_AUTHORITY }} \
+            --allow-write
+
+      - name: Run Sitecore Serialization Pull
+        id: ser_pull
+        run: |
+          echo "Running dotnet sitecore ser pull..."
+          dotnet sitecore ser pull --verbose
+        continue-on-error: true
+
+      - name: Report Failure to Teams (if needed)
+        if: steps.ser_pull.outcome != 'success'
+        run: |
+          curl -H 'Content-Type: application/json' \
+          -d '{
+              "title": "❌ Sitecore Serialization Pull Failed",
+              "text": "The GitHub Action failed to pull Sitecore serialized items.",
+              "themeColor": "FF0000"
+          }' \
+          ${{ secrets.TEAMS_WEBHOOK_URL }}
